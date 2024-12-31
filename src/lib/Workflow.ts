@@ -9,8 +9,8 @@ import { get_encoding } from "tiktoken";
 import { Model } from "./Utils";
 import RateLimiter from "./Ratelimiter";
 
-// const deviceManager = new DeviceManager();
-// await deviceManager.connect();
+const deviceManager = new DeviceManager();
+await deviceManager.connect();
 
 const expenses = new Expenses();
 const agent = new Agent();
@@ -51,13 +51,13 @@ export default class {
           `Moving the robot ${direction} at ${velocity} for ${duration}`
         );
 
-        // const command = await deviceManager.send(
-        //   `vex robot move ${direction} ${velocity}`
-        // );
-        // await new Promise((resolve) => setTimeout(resolve, duration * 1000));
-        // await deviceManager.send(`vex robot move ${direction} 0`);
-        // return command;
-        return "Example";
+        const command = await deviceManager.send(
+          `vex robot move ${direction} ${velocity}`
+        );
+        await new Promise((resolve) => setTimeout(resolve, duration * 1000));
+        await deviceManager.send(`vex robot move ${direction} 0`);
+        return command;
+        // return "Example";
       },
     });
   }

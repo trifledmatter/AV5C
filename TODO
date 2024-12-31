@@ -1,0 +1,9 @@
+Next up:
+  - Queue (FIFO) vex commands to be sent to the robot
+    so that all generated actions are executed in order
+  - Implement a way to send commands to the robot via voice
+    - Maybe even include a way to interrupt the current action
+    and execute a new one based on our command?
+  - UI to display the current state of the robot, and the
+    current action being executed, as well as the queue of actions, etc. Must also display current video feed
+  - Skill learning?
