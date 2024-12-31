@@ -1,0 +1,23 @@
+{
+  "name": "src",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/express": "^5.0.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@ai-sdk/groq": "^1.0.9",
+    "@serialport/parser-readline": "^13.0.0",
+    "ai": "^4.0.22",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "serialport": "^13.0.0",
+    "tiktoken": "^1.0.18",
+    "zod": "^3.24.1"
+  }
+}
