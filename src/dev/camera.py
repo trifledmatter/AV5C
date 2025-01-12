@@ -1,3 +1,6 @@
+import os
+from dotenv import load_dotenv
+
 import cv2
 import base64
 import threading
@@ -7,12 +10,14 @@ from .reporting import Reporter
 
 from typing import Union, Callable
 
+load_dotenv()
+
 
 class Camera:
-    def __init__(
-        self, reporter: Reporter, stream_url: str = "http://10.0.0.27:4747/video"
-    ):
-        self.stream_url = stream_url
+    def __init__(self, reporter: Reporter, stream_url: str | None = None):
+        self.stream_url = (
+            stream_url or f"http://{os.environ.get("CAMERA_SOURCE", "10.0.0.74")}:4747"
+        )
         self.cap = cv2.VideoCapture(self.stream_url)
 
         self.reporter = reporter
@@ -62,8 +67,8 @@ class Camera:
                 if not ret:
                     print("Failed to grab frame.")
                     break
-                self.frame = frame # type: ignore
-                last_frame_time = current_time # type: ignore
+                self.frame = frame  # type: ignore
+                last_frame_time = current_time  # type: ignore
 
                 if callback:
                     if base64_encode:
@@ -72,7 +77,7 @@ class Camera:
                         base64_uri = f"data:image/jpeg;base64,{base64.b64encode(raw_data).decode('utf-8')}"
                         callback(base64_uri)
                     else:
-                        callback(frame) # type: ignore
+                        callback(frame)  # type: ignore
 
             self.running = False
 
