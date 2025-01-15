@@ -2,11 +2,11 @@ from typing import Any, List, Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import os
 import requests
-from dotenv import load_dotenv
+from src.service.util import CameraStore, process_env
 
 from service import ServiceManager
+from src.dev.camera import Camera
 from src.service.types.misc import GoalSubmission, LogEntry
 from src.service.types.request import ExecutionRequest, LogsRequest
 from src.service.types.response import (
@@ -27,9 +27,8 @@ from src.service.response import Response, ServerError, ServerResponse
 from src.dev.reporting import Reporter
 from src.dev.device import DeviceManager
 
-load_dotenv()
 
-camera_src = f"http://{os.environ.get("CAMERA_SOURCE", "10.0.0.74")}:4747"
+camera_src = f"http://{process_env("CAMERA_SOURCE", "10.0.0.74")}:4747/video"
 
 app = FastAPI()
 
@@ -41,10 +40,6 @@ actor = Actor(reporter=log)
 gen = CommandGenerator(brain, reporter=log)
 goals = Goals(brain, reporter=log)
 
-service_manager = ServiceManager(
-    reporter=log,
-    goals=goals,
-)
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,6 +48,10 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True,
 )
+
+storage = CameraStore()
+camera = Camera(reporter=log, stream_url=camera_src, store=storage)
+service_manager = ServiceManager(reporter=log, goals=goals, camera=camera)
 
 
 @app.get("/dev/vex/status")
@@ -161,24 +160,35 @@ def dev_vex_execute(
 @app.get("/dev/camera")
 def dev_camera() -> Response[Any]:
     try:
-        r = requests.get(camera_src + "/video", timeout=1, stream=True)
+        latest_frame = storage.get_frame(camera_src)
 
-        status = DeviceStatus(isOnline=r.status_code >= 200 and r.status_code < 300)
-        data = CameraResponse(src=camera_src + "/video", status=status)
-
-        return ServerResponse(data)
-    except:
-        return ServerResponse(
-            CameraResponse(
-                src=camera_src + "/video", status=DeviceStatus(isOnline=False)
+        if latest_frame is None:
+            return ServerError(
+                where="fetch camera frame",
+                details={"error": "No frame available from the camera stream."},
             )
+
+        r = requests.get(camera_src, stream=True, timeout=1)
+        status = DeviceStatus(isOnline=r.status_code >= 200 and r.status_code < 300)
+
+        data = CameraResponse(
+            src=latest_frame,
+            status=status,
+        )
+        return ServerResponse(data)
+
+    except Exception as e:
+        print("Something happened:", e)
+        return ServerError(
+            where="fetch camera frame",
+            details={"error": f"An error occurred: {str(e)}"},
         )
 
 
 @app.get("/dev/camera/status")
 def dev_camera_status() -> Response[Any]:
     try:
-        r = requests.get(camera_src + "/video", timeout=1, stream=True)
+        r = requests.get(camera_src, timeout=1, stream=True)
 
         data = DeviceStatus(isOnline=r.status_code >= 200 and r.status_code < 300)
         return ServerResponse(data, deprecated=True)

@@ -24,9 +24,9 @@ class ServiceConfig(BaseModel):
 
 
 class ServiceManager:
-    def __init__(self, reporter: Reporter, goals: Goals):
+    def __init__(self, reporter: Reporter, goals: Goals, camera: Camera):
         self.log = reporter
-
+        self.camera = camera
         self.goals = goals
 
         self.state = State(
@@ -91,8 +91,8 @@ class ServiceManager:
 
             brain = BaseBrain()
             device = DeviceManager()
-            camera = Camera(reporter=self.log)
             actor = Actor(reporter=self.log)
+            camera = self.camera
             gen = CommandGenerator(brain, reporter=self.log)
 
             while self.state.running:
@@ -108,30 +108,22 @@ class ServiceManager:
                             "SERVICE", f"Processing goal: {goal['goal_request']}"
                         )
 
-                        scene = camera.snap_photo(True)
-                        if isinstance(scene, str):
-                            process_env = actor.process_environment(scene)
+                        scene = camera.snap_photo()
+                        process_env = actor.process_environment(scene)
 
-                            if not process_env:
-                                self.log.log_custom(
-                                    "SERVICE",
-                                    f"Could not process environment for goal: '{goal['goal_request']}'",
-                                )
-                                continue
-
-                            objectives = [process_env.choices[0].message.content]
-
-                            if not objectives:
-                                self.log.log_custom(
-                                    "SERVICE",
-                                    f"No objectives found for goal: '{goal['goal_request']}'",
-                                )
-                                continue
-
-                        else:
+                        if not process_env:
                             self.log.log_custom(
                                 "SERVICE",
                                 f"Could not process environment for goal: '{goal['goal_request']}'",
+                            )
+                            continue
+
+                        objectives = [process_env.choices[0].message.content]
+
+                        if not objectives:
+                            self.log.log_custom(
+                                "SERVICE",
+                                f"No objectives found for goal: '{goal['goal_request']}'",
                             )
                             continue
 
