@@ -9,6 +9,7 @@ import {
   type ReactNode,
   useMemo,
 } from "react";
+import axios from "axios";
 import type {
   Command,
   APICameraResponse,
@@ -18,7 +19,11 @@ import type {
   APIResponse,
   APIServiceStatus,
 } from "../types";
-import { axiosInstance, updateAxiosInstance } from "../axiosInstance";
+
+let SOURCE_IP = "10.0.0.74";
+const axiosInstance = axios.create({
+  baseURL: `http://${SOURCE_IP}:4000`,
+});
 
 interface WorkflowManagerContextType {
   commands: Command[];
@@ -61,10 +66,8 @@ export const WorkflowManagerProvider: React.FC<
   const stopWorkflow = useCallback(async () => {
     try {
       await axiosInstance.get<APIResponse<APIServiceStatus>>("/dev/vex/stop");
-
-      addLog("Workflow stopped.");
     } catch (error) {
-      addLog(`Failed to stop workflow: ${error}`);
+      addLog(`CLIENT: Failed to stop workflow: ${error}`);
     }
   }, [addLog]);
 
@@ -83,8 +86,8 @@ export const WorkflowManagerProvider: React.FC<
           : [{ command: "No actions performed.", status: "IDLE" }]
       );
       setIsRunning(true);
-    } catch (error) {
-      addLog(`Error starting workflow: ${error}`);
+    } catch {
+      addLog(`CLIENT: Could not start workflow`);
       setIsRunning(false);
     }
   }, [addLog]);
@@ -95,9 +98,9 @@ export const WorkflowManagerProvider: React.FC<
         await axiosInstance.get<APIResponse<APILogsResponse>>("/service/logs");
 
       const logsData = response.data.response.data?.logs ?? [];
-      logsData.forEach((log) => addLog(`${log.level}: ${log.message}`));
-    } catch (error) {
-      addLog(`Error fetching workflow state: ${error}`);
+      setLogs(logsData.map((log) => `${log.level}: ${log.message}`));
+    } catch {
+      addLog(`CLIENT: Could not fetch workflow state`);
     }
   }, [addLog]);
 
@@ -106,18 +109,12 @@ export const WorkflowManagerProvider: React.FC<
       const response =
         await axiosInstance.get<APIResponse<APICameraResponse>>("/dev/camera");
 
-      const data = response.data;
-
-      if (data.error?.hasError || !data.response.data?.status.isOnline) {
-        setIsCameraOnline(false);
-        return;
-      }
-
-      setCameraSrc(data?.response.data?.src ?? "/placeholder.jpg");
-      setIsCameraOnline(data?.response.data?.status.isOnline ?? false);
-    } catch (error) {
+      const data = response.data.response.data;
+      setCameraSrc(data?.src ?? "/placeholder.jpg");
+      setIsCameraOnline(data?.status.isOnline ?? false);
+    } catch {
       setIsCameraOnline(false);
-      addLog(`Error checking camera status: ${error}`);
+      addLog(`CLIENT: Could not get camera status`);
     }
   }, [addLog]);
 
@@ -128,18 +125,11 @@ export const WorkflowManagerProvider: React.FC<
           "/dev/vex/status"
         );
 
-      const data = response.data;
-
-      if (data.error) {
-        setIsVexOnline(false);
-        return;
-      }
-
-      setIsVexOnline(data.response.data?.isOnline ?? false);
+      const data = response.data.response.data;
+      setIsVexOnline(data?.isOnline ?? false);
+    } catch {
       setIsVexOnline(false);
-    } catch (error) {
-      setIsVexOnline(false);
-      addLog(`Error checking VEX status: ${error}`);
+      addLog(`CLIENT: Could not get VEX status`);
     }
   }, [addLog]);
 
@@ -155,7 +145,7 @@ export const WorkflowManagerProvider: React.FC<
           `Sent command: ${command}, Response: ${commandResponse?.response}`
         );
       } catch (error) {
-        addLog(`Error sending command: ${error}`);
+        addLog(`CLIENT: Error sending command: ${error}`);
       }
     },
     [addLog]
@@ -175,19 +165,27 @@ export const WorkflowManagerProvider: React.FC<
         const result = response.data.response.data;
         addLog(`Goal set to: ${goalRequest}, Response: ${result}`);
       } catch (error) {
-        addLog(`Error setting goal: ${error}`);
+        addLog(`CLIENT: Error setting goal: ${error}`);
       }
     },
     [addLog]
   );
 
   useEffect(() => {
+    const logInterval = setInterval(() => {
+      void fetchWorkflowState();
+    }, 1000);
+
     const statusInterval = setInterval(() => {
       void checkCameraStatus();
       void checkVexStatus();
-    }, 20);
-    return () => clearInterval(statusInterval);
-  }, [checkCameraStatus, checkVexStatus]);
+    }, 10);
+
+    return () => {
+      clearInterval(logInterval);
+      clearInterval(statusInterval);
+    };
+  }, [fetchWorkflowState, checkCameraStatus, checkVexStatus]);
 
   const contextValue = useMemo(
     () => ({
@@ -230,7 +228,10 @@ export const useWorkflowManagerContext = ({
 }: {
   source_ip: string;
 }) => {
-  updateAxiosInstance(source_ip);
+  if (source_ip !== SOURCE_IP) {
+    SOURCE_IP = source_ip;
+    axiosInstance.defaults.baseURL = `http://${SOURCE_IP}:4000`;
+  }
 
   const context = useContext(WorkflowManagerContext);
   if (!context) {

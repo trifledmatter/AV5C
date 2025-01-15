@@ -325,7 +325,7 @@ const Home: React.FC = () => {
             />
             <Button
               onClick={() => {
-                setSource(source + " ");
+                setCommand(command + " ");
               }}
               className="bg-white text-black hover:bg-white/90"
             >
@@ -369,7 +369,7 @@ const Home: React.FC = () => {
             />
             <Button
               onClick={() => {
-                setSource(source + " ");
+                setGoal(goal + " ");
               }}
               className="bg-white text-black hover:bg-white/90"
             >
